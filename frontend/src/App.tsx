@@ -6,6 +6,7 @@ import Header from './components/Header';
 import Home from './pages/Home';
 import Upload from './pages/Upload';
 import Preview from './pages/Preview';
+import SlideEditor from './pages/SlideEditor';
 import Settings from './pages/Settings';
 import AuthCallback from './pages/AuthCallback';
 import { AuthProvider } from './contexts/AuthContext';
@@ -40,6 +41,7 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/upload" element={<Upload />} />
             <Route path="/preview/:documentId" element={<Preview />} />
+            <Route path="/editor/:documentId" element={<SlideEditor />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
           </Routes>

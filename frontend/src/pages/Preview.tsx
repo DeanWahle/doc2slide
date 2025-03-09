@@ -17,6 +17,7 @@ import SlideshowIcon from '@mui/icons-material/Slideshow';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import TextFieldsIcon from '@mui/icons-material/TextFields';
 import TableChartIcon from '@mui/icons-material/TableChart';
+import EditIcon from '@mui/icons-material/Edit';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -245,26 +246,38 @@ const Preview: React.FC = () => {
           Back to Upload
         </Button>
         
-        {!convertSuccess ? (
+        <Box>
           <Button
-            variant="contained"
+            variant="outlined"
             color="primary"
-            startIcon={<SlideshowIcon />}
-            onClick={handleConvertToSlides}
-            disabled={converting}
+            startIcon={<EditIcon />}
+            onClick={() => navigate(`/editor/${documentId}`)}
+            sx={{ mr: 2 }}
           >
-            {converting ? 'Converting...' : 'Convert to Google Slides'}
+            Open Slide Editor
           </Button>
-        ) : (
-          <Button
-            variant="contained"
-            color="success"
-            startIcon={<SlideshowIcon />}
-            onClick={openGoogleSlides}
-          >
-            Open in Google Slides
-          </Button>
-        )}
+          
+          {!convertSuccess ? (
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<SlideshowIcon />}
+              onClick={handleConvertToSlides}
+              disabled={converting}
+            >
+              {converting ? 'Converting...' : 'Convert to Google Slides'}
+            </Button>
+          ) : (
+            <Button
+              variant="contained"
+              color="success"
+              startIcon={<SlideshowIcon />}
+              onClick={openGoogleSlides}
+            >
+              Open in Google Slides
+            </Button>
+          )}
+        </Box>
       </Box>
       
       {convertSuccess && (

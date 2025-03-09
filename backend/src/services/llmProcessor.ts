@@ -104,6 +104,11 @@ const splitIntoChunks = (text: string, maxTokens: number = 4000): string[] => {
     return [text];
   }
   
+  // Handle case of empty text
+  if (!text || text.length === 0) {
+    return [""];
+  }
+  
   // Split text into paragraphs
   const paragraphs = text.split(/\n\s*\n/);
   let currentChunk = '';
@@ -165,13 +170,14 @@ const splitIntoChunks = (text: string, maxTokens: number = 4000): string[] => {
     chunks.push(currentChunk);
   }
   
-  return chunks;
+  // Final safety check to ensure we have at least one chunk
+  return chunks.length > 0 ? chunks : [""];
 };
 
 /**
  * Process a single section through the LLM, handling token limits
  */
-const processSection = async (section: SlideSection, index: number, documentId?: string): Promise<SlideSection> => {
+const processSection = async (section: SlideSection, index: number, documentId: string): Promise<SlideSection> => {
   if (!openai) {
     return section;
   }
@@ -200,9 +206,9 @@ const processSection = async (section: SlideSection, index: number, documentId?:
       }
       
       // Prepare the prompt based on content type
-      let prompt = '';
+      let userPrompt = '';
       if (section.type === 'bullet_points') {
-        prompt = `Transform this content into an engaging slide titled "${section.title}" following best presentation practices. 
+        userPrompt = `Transform this content into an engaging slide titled "${section.title}" following best presentation practices.
         
 Content to transform:
 
@@ -215,7 +221,7 @@ Create a slide that includes:
 4. Ensure logical flow and coherence between points
 5. Focus on the most important insights, data, or concepts`;
       } else {
-        prompt = `Transform this content into an engaging slide titled "${section.title}" following best presentation practices.
+        userPrompt = `Transform this content into an engaging slide titled "${section.title}" following best presentation practices.
         
 Content to transform:
 
@@ -235,61 +241,30 @@ Create a slide that includes:
         messages: [
           { 
             role: "system", 
-            content: `You are an expert at converting detailed documents into engaging and informative Google Slides or PowerPoint presentations. Follow this structured approach precisely:
+            content: `You are an expert at converting detailed documents into engaging and informative presentation slides. Follow this structured approach precisely:
 
-Step 1: Analyze and Summarize
+1. Analyze and Summarize
+- Carefully read the provided content to grasp the main ideas, arguments, key insights, and supporting details.
+- Identify the core message, purpose, and logical structure.
 
-Carefully read the entire document to grasp the main ideas, arguments, key insights, and supporting details.
+2. Slide Content Creation
+- Create concise, informative slide content with:
+  - Clear, compelling headline (improve the provided title if necessary)
+  - Key bullet points (3-6) summarizing main ideas
+  - Each bullet point should be 1-2 lines maximum
+  - Focus on essential information that creates value
+  - Ensure logical flow and coherence between points
 
-Identify the document's core message, purpose, and intended audience.
+3. Presentation Best Practices
+- Limit text to short phrases or bullet points
+- Eliminate unnecessary words or redundancies
+- Use active voice and strong, precise language
+- Maintain a consistent tone appropriate for professional settings
+- Format consistently (capitalize first word of each bullet or all words, but be consistent)
 
-Step 2: Slide Structure Outline
-
-Develop a clear slide outline, ensuring logical flow and coherence:
-
-Title Slide: Clear title and subtitle reflecting the document’s main idea.
-
-Agenda Slide: List topics covered in the presentation.
-
-Introduction Slide: Brief context, objectives, or background information.
-
-Body Slides: Divide the main content into digestible sections. Each slide should have:
-
-A concise, informative heading.
-
-Key bullet points summarizing main ideas.
-
-Relevant supporting evidence or data points (charts, graphs, quotes, etc., if applicable).
-
-Summary Slide: Concise recap of the main points.
-
-Actionable Insights or Next Steps Slide: Clearly defined takeaways or actions suggested by the document.
-
-Q&A Slide: Invite questions or discussion points.
-
-Step 3: Slide Content Creation
-
-For each slide, clearly and succinctly present the information:
-
-Limit text to short phrases or bullet points.
-
-Highlight only the most essential information.
-
-Recommend appropriate visuals or graphics (charts, tables, diagrams) when useful for enhancing understanding.
-
-Step 4: Visual and Design Recommendations
-
-Suggest a visual theme or style suitable for the audience and topic.
-
-Recommend minimalistic yet appealing designs (fonts, color schemes, layouts).
-
-Step 5: Speaker Notes
-
-Provide concise speaker notes for each slide to guide the presenter, containing deeper explanations, context, or relevant examples from the document.
-
-Ensure clarity, brevity, and visual appeal, enabling the audience to easily understand and engage with the presentation.` 
+Your output should be ONLY the bullet points for the slide, without any additional commentary, explanations, or formatting instructions.`
           },
-          { role: "user", content: prompt }
+          { role: "user", content: userPrompt }
         ],
         max_tokens: 700,
         temperature: 0.7,
@@ -332,13 +307,13 @@ Ensure clarity, brevity, and visual appeal, enabling the audience to easily unde
       for (let i = 0; i < chunks.length; i++) {
         console.log(`Processing chunk ${i + 1}/${chunks.length} of section ${index + 1}`);
         
-        let prompt = '';
+        let userPrompt = '';
         if (i === 0) {
-          prompt = `This is part 1 of ${chunks.length} from a section titled "${section.title}". Extract the key points that would be most valuable for a presentation slide:
+          userPrompt = `This is part 1 of ${chunks.length} from a section titled "${section.title}". Extract the key points that would be most valuable for a presentation slide:
 
 ${chunks[i]}`;
         } else {
-          prompt = `This is part ${i + 1} of ${chunks.length} from a section titled "${section.title}". Extract additional key points that would be most valuable for a presentation slide:
+          userPrompt = `This is part ${i + 1} of ${chunks.length} from a section titled "${section.title}". Extract additional key points that would be most valuable for a presentation slide:
 
 ${chunks[i]}`;
         }
@@ -357,9 +332,9 @@ ${chunks[i]}`;
 4. Focus on insights, conclusions, data points, or concepts that provide the most value
 5. Ensure bullet points are clear, specific, and meaningful even without the surrounding context
 
-Your output should be ONLY the bullet points, without any additional commentary, explanations, or formatting instructions.` 
+Your output should be ONLY the bullet points, without any additional commentary, explanations, or formatting instructions.`
               },
-              { role: "user", content: prompt }
+              { role: "user", content: userPrompt }
             ],
             max_tokens: 350,
             temperature: 0.7,
@@ -412,6 +387,10 @@ Your output should be ONLY the bullet points, without any additional commentary,
             });
           }
           
+          const userPrompt = `Create a focused presentation slide titled "${section.title}" by refining these extracted bullet points into 4-6 key takeaways:
+
+${combinedContent}`;
+
           const response = await openai.chat.completions.create({
             model: "gpt-4o",
             messages: [
@@ -426,11 +405,9 @@ Your output should be ONLY the bullet points, without any additional commentary,
 5. Refine the language to be concise, clear, and impactful
 6. Ensure each bullet point is brief (1-2 lines maximum)
 
-Your output should be ONLY the final bullet points for the slide, without any additional commentary, explanations, or formatting instructions.` 
+Your output should be ONLY the final bullet points for the slide, without any additional commentary, explanations, or formatting instructions.`
               },
-              { role: "user", content: `Create a focused presentation slide titled "${section.title}" by refining these extracted bullet points into 4-6 key takeaways:
-
-${combinedContent}` }
+              { role: "user", content: userPrompt }
             ],
             max_tokens: 700,
             temperature: 0.7,
@@ -497,7 +474,7 @@ export const enhanceWithLLM = async (content: DocumentContent, documentId?: stri
   try {
     // Process each section through the LLM
     const enhancedSections = await Promise.all(
-      content.sections.map((section, index) => processSection(section, index, documentId))
+      content.sections.map((section, index) => processSection(section, index, documentId || ''))
     );
     
     if (documentId) {
@@ -535,6 +512,8 @@ export const generateTitleDescription = async (title: string): Promise<string> =
   }
 
   try {
+    const userPrompt = `Create an engaging, professional subtitle for a presentation titled "${title}". Keep it concise and compelling.`;
+
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
@@ -551,12 +530,9 @@ export const generateTitleDescription = async (title: string): Promise<string> =
    - Uses professional but engaging language
    - Complements rather than repeats the main title
 
-Your output should be ONLY the subtitle text, without any additional commentary, explanations, or formatting instructions.` 
+Your output should be ONLY the subtitle text, without any additional commentary, explanations, or formatting instructions.`
         },
-        { 
-          role: "user", 
-          content: `Create an engaging, professional subtitle for a presentation titled "${title}". Keep it concise and compelling.` 
-        }
+        { role: "user", content: userPrompt }
       ],
       max_tokens: 100,
       temperature: 0.7,
@@ -625,6 +601,15 @@ export const generateConclusionSlide = async (documentContent: DocumentContent, 
       sampleContent += `${section.title}:\n${contentSample}...\n\n`;
     });
     
+    const userPrompt = `Create 3-5 impactful bullet points for a conclusion slide for a presentation titled "${documentContent.title}".
+
+The presentation covers these sections: ${sectionTitlesText}
+
+Here's a sample of some content from the presentation:
+${sampleContent}
+
+Focus on synthesizing key takeaways and providing a strong conclusion.`;
+    
     // Also include document title for context
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
@@ -642,19 +627,9 @@ export const generateConclusionSlide = async (documentContent: DocumentContent, 
    - Are concise and impactful (1-2 lines each)
    - Have a coherent flow and structure
 
-Your output should be ONLY the bullet points for the conclusion slide, without any additional commentary, explanations, or formatting instructions.` 
+Your output should be ONLY the bullet points for the conclusion slide, without any additional commentary, explanations, or formatting instructions.`
         },
-        { 
-          role: "user", 
-          content: `Create 3-5 impactful bullet points for a conclusion slide for a presentation titled "${documentContent.title}".
-
-The presentation covers these sections: ${sectionTitlesText}
-
-Here's a sample of some content from the presentation:
-${sampleContent}
-
-Focus on synthesizing key takeaways and providing a strong conclusion.` 
-        }
+        { role: "user", content: userPrompt }
       ],
       max_tokens: 400,
       temperature: 0.7,

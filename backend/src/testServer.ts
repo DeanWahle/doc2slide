@@ -9,6 +9,7 @@ import { processPdf } from './services/pdfProcessor';
 import { processTxt } from './services/txtProcessor';
 import { enhanceWithLLM, generateConclusionSlide, processingProgress } from './services/llmProcessor';
 import { createSlides } from './services/slidesService';
+import { processSlideModificationRequest, applySlideModifications } from './services/slideAssistantService';
 
 // Load environment variables
 dotenv.config();
@@ -271,6 +272,58 @@ app.post('/api/documents/:documentId/convert', async (req, res) => {
     console.error('Conversion error:', error);
     res.status(500).json({ 
       error: 'Failed to convert to slides',
+      details: error.message || 'Unknown error'
+    });
+  }
+});
+
+// Slide assistant route
+app.post('/api/slides/assistant', async (req, res) => {
+  try {
+    console.log('Slide assistant request received');
+    
+    const { message, documentId, slideIndex, chatHistory } = req.body;
+    
+    if (!message || !documentId || slideIndex === undefined) {
+      return res.status(400).json({ error: 'Missing required parameters' });
+    }
+    
+    // Get the document
+    const document = processedDocuments.get(documentId);
+    if (!document || !document.content) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+    
+    // Get the current slide
+    const slide = document.content.sections[slideIndex];
+    if (!slide) {
+      return res.status(404).json({ error: 'Slide not found' });
+    }
+    
+    // Process the request
+    const { responseMessage, modifications } = await processSlideModificationRequest(
+      message,
+      slide,
+      chatHistory || []
+    );
+    
+    // Apply modifications if any
+    if (modifications) {
+      const updatedSlide = applySlideModifications(slide, modifications);
+      document.content.sections[slideIndex] = updatedSlide;
+      processedDocuments.set(documentId, document);
+    }
+    
+    // Return the response
+    res.status(200).json({
+      message: responseMessage,
+      modifications,
+      updatedSlide: document.content.sections[slideIndex]
+    });
+  } catch (error: any) {
+    console.error('Slide assistant error:', error);
+    res.status(500).json({ 
+      error: 'Failed to process slide assistant request',
       details: error.message || 'Unknown error'
     });
   }
