@@ -1,0 +1,4 @@
+"Has anyone had luck with creating slides from longer documents?
+I've tried using Gemini within Google Slides to create a slide in the Gusto corporate template using a word document.
+I can get the bullet points I want, but Gemini is generating irrelevant Al images and the formatting is off"
+
